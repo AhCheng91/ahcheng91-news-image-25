@@ -1,8 +1,9 @@
-"""Publish the drawn broadsheet page: copy entry.png to the output directory.
+"""Ship the finished front page to the output folder and verify it.
 
-The file is written into $MAKEFUN_OUTPUT_DIR (default /output), the copied
-bytes are hashed and the digest is checked against the source, so a truncated
-or altered transfer fails loudly instead of shipping a broken picture.
+entry.png beside this script is copied into $MAKEFUN_OUTPUT_DIR (created on
+demand, /output when the variable is unset). The bytes that landed are hashed
+and the digest must match the original, so a partial or corrupted copy is
+reported as a failure rather than silently published.
 """
 
 import hashlib
@@ -11,34 +12,29 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(HERE, "entry.png")
-NAME = os.path.basename(SOURCE)
+SRC = os.path.join(HERE, "entry.png")
 
 
-def digest(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for block in iter(lambda: fh.read(1 << 20), b""):
-            h.update(block)
-    return h.hexdigest()
+def sha(path):
+    with open(path, "rb") as handle:
+        return hashlib.sha256(handle.read()).hexdigest()
 
 
 def main():
-    source_size = os.path.getsize(SOURCE)
-    print("entry: %s %d bytes" % (NAME, source_size))
-    if source_size >= 1048576:
+    name = os.path.basename(SRC)
+    size = os.path.getsize(SRC)
+    print("entry: %s %d bytes" % (name, size))
+    if size >= 1048576:
         print("too large")
         return 1
-    outdir = os.environ.get("MAKEFUN_OUTPUT_DIR") or "/output"
+    outdir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(outdir, exist_ok=True)
-    target = os.path.join(outdir, NAME)
-    shutil.copyfile(SOURCE, target)
-    size = os.path.getsize(target)
-    copied = digest(target)
-    print(size)
-    print(copied)
-    if copied != digest(SOURCE):
-        print("sha256 mismatch", file=sys.stderr)
+    dst = os.path.join(outdir, name)
+    shutil.copyfile(SRC, dst)
+    print("size", os.path.getsize(dst))
+    print("sha256", sha(dst))
+    if sha(dst) != sha(SRC):
+        print("copy does not match the source")
         return 1
     return 0
 
